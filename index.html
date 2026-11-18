@@ -1,0 +1,1730 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Super Motion Bros - Controle por Webcam HD (NES 8-Bit)</title>
+    <!-- Fonte Pixel Art estilo NES -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --nes-sky: #5c94fc;
+            --nes-red: #e52521;
+            --nes-yellow: #fbd000;
+            --nes-green: #43b047;
+            --nes-dark: #111111;
+            --nes-panel: #202028;
+        }
+
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #0d0d12;
+            color: #ffffff;
+            font-family: 'Press Start 2P', monospace;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* Barra Superior de Controle e Calibração */
+        header {
+            background-color: var(--nes-panel);
+            border-bottom: 4px solid #ffffff;
+            padding: 10px 16px;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            z-index: 20;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 13px;
+            color: var(--nes-yellow);
+            text-shadow: 2px 2px 0px #000;
+        }
+
+        .controls-bar {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 14px;
+            font-size: 10px;
+        }
+
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: #14141a;
+            padding: 6px 10px;
+            border: 2px solid #555;
+            border-radius: 6px;
+        }
+
+        input[type="range"] {
+            accent-color: var(--nes-yellow);
+            cursor: pointer;
+            width: 90px;
+        }
+
+        .btn-8bit {
+            font-family: 'Press Start 2P', monospace;
+            font-size: 10px;
+            padding: 8px 12px;
+            background-color: var(--nes-red);
+            color: #fff;
+            border: 3px solid #fff;
+            box-shadow: 3px 3px 0px #000;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: transform 0.08s;
+        }
+
+        .btn-8bit:hover {
+            filter: brightness(1.15);
+        }
+
+        .btn-8bit:active {
+            transform: translate(2px, 2px);
+            box-shadow: 1px 1px 0px #000;
+        }
+
+        .btn-green {
+            background-color: var(--nes-green);
+        }
+
+        .btn-blue {
+            background-color: #2563eb;
+        }
+
+        /* Área Principal do Jogo */
+        main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 12px;
+            position: relative;
+        }
+
+        .game-wrapper {
+            position: relative;
+            width: 100%;
+            max-width: 1024px;
+            aspect-ratio: 16 / 9;
+            background-color: var(--nes-sky);
+            border: 4px solid #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 12px 35px rgba(0, 0, 0, 0.85);
+            overflow: hidden;
+        }
+
+        canvas#gameCanvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            image-rendering: pixelated;
+        }
+
+        /* Painel PIP da Webcam HD com Zonas de Movimento */
+        .webcam-pip {
+            position: absolute;
+            top: 54px;
+            right: 12px;
+            width: 240px;
+            aspect-ratio: 16 / 9;
+            background: #000;
+            border: 3px solid #fff;
+            border-radius: 6px;
+            box-shadow: 4px 4px 0px rgba(0, 0, 0, 0.85);
+            overflow: hidden;
+            z-index: 10;
+            transition: all 0.25s ease;
+        }
+
+        .webcam-pip.expanded {
+            width: 420px;
+        }
+
+        .webcam-pip.hidden {
+            display: none;
+        }
+
+        canvas#motionCanvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        .pip-label {
+            position: absolute;
+            bottom: 3px;
+            left: 5px;
+            font-size: 7px;
+            color: #fff;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 2px 4px;
+            border-radius: 2px;
+            pointer-events: none;
+        }
+
+        /* Telas Sobrepostas (Início, Game Over, Vitória) */
+        .overlay-screen {
+            position: absolute;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.78);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 24px;
+            z-index: 15;
+            backdrop-filter: blur(2px);
+        }
+
+        .overlay-screen.hidden {
+            display: none;
+        }
+
+        .title-box {
+            background: #c84c0c;
+            border: 4px solid #fff;
+            box-shadow: 6px 6px 0px #000;
+            padding: 20px 28px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            max-width: 680px;
+        }
+
+        .title-box h1 {
+            margin: 0 0 10px 0;
+            font-size: clamp(18px, 3vw, 28px);
+            color: #fbd000;
+            text-shadow: 3px 3px 0px #000;
+            line-height: 1.3;
+        }
+
+        .title-box p {
+            margin: 0;
+            font-size: 10px;
+            color: #fff;
+            line-height: 1.6;
+        }
+
+        .instructions-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            max-width: 680px;
+            width: 100%;
+            margin-bottom: 22px;
+        }
+
+        .inst-card {
+            background: #202028;
+            border: 2px solid #fff;
+            border-radius: 6px;
+            padding: 10px 8px;
+            font-size: 9px;
+            line-height: 1.5;
+        }
+
+        .inst-card span {
+            display: block;
+            font-size: 16px;
+            margin-bottom: 6px;
+        }
+
+        .btn-large {
+            font-size: 13px;
+            padding: 14px 24px;
+            margin: 6px;
+        }
+
+        /* Caixa de Mensagens / Notificações sem alert() */
+        .toast-msg {
+            position: fixed;
+            bottom: 18px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #18181f;
+            color: var(--nes-yellow);
+            border: 3px solid #fff;
+            padding: 10px 18px;
+            font-size: 10px;
+            border-radius: 6px;
+            box-shadow: 4px 4px 0px #000;
+            z-index: 50;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.25s;
+            text-align: center;
+            max-width: 90vw;
+        }
+
+        .toast-msg.show {
+            opacity: 1;
+        }
+
+        /* Responsividade Mobile/Tablet */
+        @media (max-width: 768px) {
+            .webcam-pip {
+                width: 150px;
+                top: 46px;
+                right: 8px;
+            }
+            .webcam-pip.expanded {
+                width: 240px;
+            }
+            .instructions-grid {
+                grid-template-columns: 1fr;
+            }
+            header {
+                justify-content: center;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Barra Superior de Calibração e Controles -->
+    <header>
+        <div class="brand">
+            <span>🍄 SUPER MOTION BROS</span>
+        </div>
+
+        <div class="controls-bar">
+            <div class="control-group" title="Ajusta o quão sensível é a detecção de movimento na câmera">
+                <label for="sensitivitySlider">SENSIBILIDADE:</label>
+                <input type="range" id="sensitivitySlider" min="10" max="90" value="55">
+                <span id="sensitivityVal">55%</span>
+            </div>
+
+            <button id="toggleCamBtn" class="btn-8bit btn-green">📷 CÂMERA: OFF</button>
+            <button id="resizePipBtn" class="btn-8bit btn-blue" title="Alternar tamanho da janela da webcam">🔍 PIP</button>
+            <button id="muteBtn" class="btn-8bit" title="Ativar/Desativar Som 8-bit">🔊 SOM: ON</button>
+        </div>
+    </header>
+
+    <!-- Área Principal -->
+    <main>
+        <div class="game-wrapper" id="gameContainer">
+            <!-- Canvas Principal do Jogo 8-bit -->
+            <canvas id="gameCanvas" width="960" height="540"></canvas>
+
+            <!-- Vídeo oculto da Webcam HD -->
+            <video id="webcamVideo" autoplay playsinline muted style="display:none;"></video>
+
+            <!-- Painel PIP com Mapa de Calor e Zonas de Movimento -->
+            <div class="webcam-pip hidden" id="webcamPip">
+                <canvas id="motionCanvas" width="320" height="180"></canvas>
+                <div class="pip-label" id="camResLabel">WEBCAM HD • ZONAS ATIVAS</div>
+            </div>
+
+            <!-- Tela Inicial -->
+            <div class="overlay-screen" id="startScreen">
+                <div class="title-box">
+                    <h1>SUPER MOTION BROS</h1>
+                    <p>CONTROLE O HERÓI COM O MOVIMENTO DO SEU CORPO NA WEBCAM HD OU USE O TECLADO (SETAS / WASD + ESPAÇO)</p>
+                </div>
+
+                <div class="instructions-grid">
+                    <div class="inst-card">
+                        <span>⬅️</span>
+                        <strong>ZONA ESQUERDA</strong><br>
+                        Agite na metade esquerda da câmera para andar à esquerda
+                    </div>
+                    <div class="inst-card">
+                        <span>⬆️</span>
+                        <strong>ZONA SUPERIOR</strong><br>
+                        Levante os braços ou pule para saltar sobre inimigos!
+                    </div>
+                    <div class="inst-card">
+                        <span>➡️</span>
+                        <strong>ZONA DIREITA</strong><br>
+                        Agite na metade direita da câmera para correr à direita
+                    </div>
+                </div>
+
+                <div>
+                    <button id="startWithCamBtn" class="btn-8bit btn-green btn-large">📷 INICIAR CÂMERA E JOGAR</button>
+                    <button id="startKeyboardBtn" class="btn-8bit btn-blue btn-large">⌨️ JOGAR SÓ COM TECLADO</button>
+                </div>
+            </div>
+
+            <!-- Tela de Game Over -->
+            <div class="overlay-screen hidden" id="gameOverScreen">
+                <div class="title-box" style="background:#111;">
+                    <h1 style="color:#e52521;">GAME OVER</h1>
+                    <p id="gameOverStats">PONTUAÇÃO FINAL: 000000</p>
+                </div>
+                <button id="restartGameOverBtn" class="btn-8bit btn-green btn-large">🔄 JOGAR NOVAMENTE</button>
+            </div>
+
+            <!-- Tela de Vitória -->
+            <div class="overlay-screen hidden" id="victoryScreen">
+                <div class="title-box" style="background:#1e6b24;">
+                    <h1 style="color:#fbd000;">FASE CONCLUÍDA!</h1>
+                    <p id="victoryStats">VOCÊ ALCANÇOU A BANDEIRA DO CASTELO!</p>
+                </div>
+                <button id="restartVictoryBtn" class="btn-8bit btn-green btn-large">🏆 JOGAR NOVAMENTE</button>
+            </div>
+        </div>
+    </main>
+
+    <!-- Notificação Toast Customizada -->
+    <div class="toast-msg" id="toastMsg"></div>
+
+    <script>
+        /**
+         * ============================================================================
+         * SUPER MOTION BROS (NES 8-BIT EDITION)
+         * Motor de Jogo 2D + Sintetizador Chiptune + Detecção de Movimento Webcam HD
+         * ============================================================================
+         */
+
+        // --- ELEMENTOS DO DOM ---
+        const gameCanvas = document.getElementById('gameCanvas');
+        const ctx = gameCanvas.getContext('2d');
+        const motionCanvas = document.getElementById('motionCanvas');
+        const mCtx = motionCanvas.getContext('2d', { willReadFrequently: true });
+        const video = document.getElementById('webcamVideo');
+        const webcamPip = document.getElementById('webcamPip');
+        const camResLabel = document.getElementById('camResLabel');
+
+        const startScreen = document.getElementById('startScreen');
+        const gameOverScreen = document.getElementById('gameOverScreen');
+        const victoryScreen = document.getElementById('victoryScreen');
+        const toastMsg = document.getElementById('toastMsg');
+
+        const sensitivitySlider = document.getElementById('sensitivitySlider');
+        const sensitivityVal = document.getElementById('sensitivityVal');
+        const toggleCamBtn = document.getElementById('toggleCamBtn');
+        const resizePipBtn = document.getElementById('resizePipBtn');
+        const muteBtn = document.getElementById('muteBtn');
+
+        // Canvas offscreen de baixa resolução para análise ultra-rápida de fluxo óptico / diferença de frames
+        const procCanvas = document.createElement('canvas');
+        procCanvas.width = 160;
+        procCanvas.height = 90;
+        const pCtx = procCanvas.getContext('2d', { willReadFrequently: true });
+
+        // --- NOTIFICAÇÃO VISUAL (SUBSTITUI alert()) ---
+        let toastTimeout = null;
+        function showToast(text, duration = 3500) {
+            toastMsg.textContent = text;
+            toastMsg.classList.add('show');
+            clearTimeout(toastTimeout);
+            toastTimeout = setTimeout(() => {
+                toastMsg.classList.remove('show');
+            }, duration);
+        }
+
+        // ============================================================================
+        // 1. SINTETIZADOR DE ÁUDIO 8-BIT (WEB AUDIO API)
+        // ============================================================================
+        class ChiptuneAudio {
+            constructor() {
+                this.ctx = null;
+                this.muted = false;
+            }
+
+            init() {
+                if (!this.ctx) {
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    this.ctx = new AudioContext();
+                }
+                if (this.ctx.state === 'suspended') {
+                    this.ctx.resume();
+                }
+            }
+
+            playTone(freqStart, freqEnd, duration, type = 'square', volume = 0.12, delay = 0) {
+                if (this.muted) return;
+                this.init();
+                try {
+                    const now = this.ctx.currentTime + delay;
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+
+                    osc.type = type;
+                    osc.frequency.setValueAtTime(freqStart, now);
+                    if (freqEnd !== freqStart) {
+                        osc.frequency.exponentialRampToValueAtTime(Math.max(20, freqEnd), now + duration);
+                    }
+
+                    gain.gain.setValueAtTime(volume, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+
+                    osc.start(now);
+                    osc.stop(now + duration);
+                } catch (e) {
+                    // Ignora falhas de áudio antes da interação do usuário
+                }
+            }
+
+            jump() {
+                this.playTone(180, 580, 0.22, 'square', 0.12);
+            }
+
+            coin() {
+                this.playTone(987.77, 987.77, 0.08, 'square', 0.12, 0);
+                this.playTone(1318.51, 1318.51, 0.28, 'square', 0.12, 0.08);
+            }
+
+            bump() {
+                this.playTone(140, 55, 0.12, 'triangle', 0.18);
+            }
+
+            stomp() {
+                this.playTone(320, 90, 0.15, 'sawtooth', 0.15);
+            }
+
+            hurt() {
+                this.playTone(440, 110, 0.35, 'sawtooth', 0.16);
+            }
+
+            gameOver() {
+                const notes = [392, 349.23, 329.63, 261.63];
+                notes.forEach((n, idx) => {
+                    this.playTone(n, n * 0.95, 0.25, 'triangle', 0.15, idx * 0.24);
+                });
+            }
+
+            victory() {
+                const melody = [523.25, 659.25, 783.99, 1046.50, 783.99, 1046.50];
+                const times = [0, 0.12, 0.24, 0.36, 0.52, 0.66];
+                melody.forEach((n, idx) => {
+                    this.playTone(n, n, idx === 5 ? 0.45 : 0.11, 'square', 0.13, times[idx]);
+                });
+            }
+        }
+
+        const sfx = new ChiptuneAudio();
+
+        // ============================================================================
+        // 2. SISTEMA DE CAPTURA DE MOVIMENTO VIA WEBCAM HD
+        // ============================================================================
+        const motionState = {
+            active: false,
+            stream: null,
+            prevFrame: null,
+            sensitivity: 55, // 10 a 90
+            leftEnergy: 0,
+            rightEnergy: 0,
+            topEnergy: 0,
+            moveLeft: false,
+            moveRight: false,
+            jump: false,
+            jumpCooldown: 0
+        };
+
+        async function startWebcam() {
+            try {
+                if (motionState.active) return true;
+
+                const constraints = {
+                    video: {
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 },
+                        facingMode: 'user'
+                    },
+                    audio: false
+                };
+
+                const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                video.srcObject = stream;
+                await video.play();
+
+                motionState.stream = stream;
+                motionState.active = true;
+                motionState.prevFrame = null;
+
+                const track = stream.getVideoTracks()[0];
+                const settings = track.getSettings();
+                const resText = settings.width && settings.height ? `${settings.width}x${settings.height} HD` : 'HD';
+                camResLabel.textContent = `CAM ${resText} • ZONAS`;
+
+                webcamPip.classList.remove('hidden');
+                toggleCamBtn.textContent = '📷 CÂMERA: ON';
+                toggleCamBtn.classList.add('btn-green');
+                toggleCamBtn.classList.remove('btn-red');
+
+                showToast(`Webcam HD conectada (${resText})! Mova-se nas zonas para jogar.`);
+                return true;
+            } catch (err) {
+                console.warn('Erro ao acessar webcam:', err);
+                showToast('Não foi possível acessar a Webcam. Use as Setas/WASD + Espaço para jogar!', 4500);
+                stopWebcam();
+                return false;
+            }
+        }
+
+        function stopWebcam() {
+            if (motionState.stream) {
+                motionState.stream.getTracks().forEach(t => t.stop());
+                motionState.stream = null;
+            }
+            motionState.active = false;
+            motionState.prevFrame = null;
+            motionState.moveLeft = false;
+            motionState.moveRight = false;
+            motionState.jump = false;
+
+            webcamPip.classList.add('hidden');
+            toggleCamBtn.textContent = '📷 CÂMERA: OFF';
+            toggleCamBtn.classList.remove('btn-green');
+        }
+
+        /**
+         * Processa o frame atual da webcam espelhada, calcula diferença de luminância
+         * e ativa as zonas: Esquerda, Direita e Superior (Pulo).
+         */
+        function processWebcamMotion() {
+            if (!motionState.active || video.readyState < 2) return;
+
+            const w = procCanvas.width;   // 160
+            const h = procCanvas.height;  // 90
+
+            // Desenha vídeo espelhado no canvas de processamento
+            pCtx.save();
+            pCtx.translate(w, 0);
+            pCtx.scale(-1, 1);
+            pCtx.drawImage(video, 0, 0, w, h);
+            pCtx.restore();
+
+            const frame = pCtx.getImageData(0, 0, w, h);
+            const data = frame.data;
+
+            // Desenha vídeo espelhado no painel PIP visível
+            const mw = motionCanvas.width;
+            const mh = motionCanvas.height;
+            mCtx.save();
+            mCtx.translate(mw, 0);
+            mCtx.scale(-1, 1);
+            mCtx.drawImage(video, 0, 0, mw, mh);
+            mCtx.restore();
+
+            if (!motionState.prevFrame) {
+                motionState.prevFrame = new Uint8ClampedArray(data);
+                return;
+            }
+
+            const prev = motionState.prevFrame;
+
+            // Limiar de diferença de pixel invertido pela sensibilidade (sensibilidade maior = limiar menor)
+            const pixelDiffThreshold = Math.max(14, 75 - motionState.sensitivity * 0.65);
+
+            let leftCount = 0;
+            let rightCount = 0;
+            let topCount = 0;
+
+            const topZoneLimitY = Math.floor(h * 0.34); // Faixa superior (34% do topo) para PULO
+            const midX = Math.floor(w * 0.5);
+
+            // Overlay de mapa de calor no PIP
+            mCtx.fillStyle = 'rgba(255, 230, 0, 0.55)';
+            const scaleX = mw / w;
+            const scaleY = mh / h;
+
+            // Amostragem a cada 2 pixels para performance 60 FPS
+            for (let y = 0; y < h; y += 2) {
+                for (let x = 0; x < w; x += 2) {
+                    const idx = (y * w + x) * 4;
+
+                    // Luminância aproximada
+                    const lumCurr = (data[idx] * 0.299 + data[idx + 1] * 0.587 + data[idx + 2] * 0.114);
+                    const lumPrev = (prev[idx] * 0.299 + prev[idx + 1] * 0.587 + prev[idx + 2] * 0.114);
+                    const diff = Math.abs(lumCurr - lumPrev);
+
+                    if (diff > pixelDiffThreshold) {
+                        // Desenha pixel ativo no mapa de calor do PIP
+                        mCtx.fillRect(x * scaleX, y * scaleY, scaleX * 2, scaleY * 2);
+
+                        if (y < topZoneLimitY) {
+                            topCount++;
+                        } else if (x < midX) {
+                            leftCount++;
+                        } else {
+                            rightCount++;
+                        }
+                    }
+                }
+            }
+
+            // Atualiza buffer anterior com suavização leve para evitar ruído estático
+            for (let i = 0; i < data.length; i += 4) {
+                prev[i] = data[i];
+                prev[i + 1] = data[i + 1];
+                prev[i + 2] = data[i + 2];
+            }
+
+            // Normaliza energias de cada zona (0.0 a 1.0)
+            const totalHalfBottomSamples = ((h - topZoneLimitY) * midX) / 4;
+            const totalTopSamples = (topZoneLimitY * w) / 4;
+
+            const rawLeft = Math.min(1, leftCount / (totalHalfBottomSamples * 0.14));
+            const rawRight = Math.min(1, rightCount / (totalHalfBottomSamples * 0.14));
+            const rawTop = Math.min(1, topCount / (totalTopSamples * 0.13));
+
+            // Suavização temporal
+            motionState.leftEnergy = motionState.leftEnergy * 0.55 + rawLeft * 0.45;
+            motionState.rightEnergy = motionState.rightEnergy * 0.55 + rawRight * 0.45;
+            motionState.topEnergy = motionState.topEnergy * 0.45 + rawTop * 0.55;
+
+            const activationThreshold = 0.28;
+
+            motionState.moveLeft = motionState.leftEnergy > activationThreshold && motionState.leftEnergy > motionState.rightEnergy * 1.1;
+            motionState.moveRight = motionState.rightEnergy > activationThreshold && motionState.rightEnergy > motionState.leftEnergy * 1.1;
+
+            if (motionState.jumpCooldown > 0) motionState.jumpCooldown--;
+            if (motionState.topEnergy > 0.32 && motionState.jumpCooldown === 0) {
+                motionState.jump = true;
+                motionState.jumpCooldown = 14;
+            } else {
+                motionState.jump = false;
+            }
+
+            // Desenha grades e indicadores das zonas no PIP
+            drawPipZonesOverlay(mw, mh);
+        }
+
+        function drawPipZonesOverlay(mw, mh) {
+            const topH = mh * 0.34;
+            const midX = mw * 0.5;
+
+            // Zona Superior (PULO)
+            mCtx.fillStyle = motionState.topEnergy > 0.32 ? 'rgba(67, 176, 71, 0.42)' : 'rgba(67, 176, 71, 0.10)';
+            mCtx.fillRect(0, 0, mw, topH);
+
+            // Zona Esquerda
+            mCtx.fillStyle = motionState.moveLeft ? 'rgba(251, 208, 0, 0.42)' : 'rgba(0, 0, 0, 0.12)';
+            mCtx.fillRect(0, topH, midX, mh - topH);
+
+            // Zona Direita
+            mCtx.fillStyle = motionState.moveRight ? 'rgba(251, 208, 0, 0.42)' : 'rgba(0, 0, 0, 0.12)';
+            mCtx.fillRect(midX, topH, midX, mh - topH);
+
+            // Linhas divisórias 8-bit
+            mCtx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
+            mCtx.lineWidth = 2;
+            mCtx.setLineDash([4, 4]);
+
+            mCtx.beginPath();
+            mCtx.moveTo(0, topH);
+            mCtx.lineTo(mw, topH);
+            mCtx.moveTo(midX, topH);
+            mCtx.lineTo(midX, mh);
+            mCtx.stroke();
+            mCtx.setLineDash([]);
+
+            // Rótulos das zonas
+            mCtx.font = 'bold 9px "Press Start 2P", monospace';
+            mCtx.fillStyle = '#ffffff';
+            mCtx.textAlign = 'center';
+            mCtx.fillText('▲ PULO', mw / 2, topH - 8);
+            mCtx.fillText('◄ ESQ', midX / 2, topH + (mh - topH) / 2 + 4);
+            mCtx.fillText('DIR ►', midX + midX / 2, topH + (mh - topH) / 2 + 4);
+        }
+
+        // ============================================================================
+        // 3. CONTROLES DE TECLADO (FALLBACK E SUPORTE HÍBRIDO)
+        // ============================================================================
+        const keys = {
+            left: false,
+            right: false,
+            up: false
+        };
+
+        window.addEventListener('keydown', (e) => {
+            if (['ArrowLeft', 'KeyA'].includes(e.code)) keys.left = true;
+            if (['ArrowRight', 'KeyD'].includes(e.code)) keys.right = true;
+            if (['ArrowUp', 'KeyW', 'Space'].includes(e.code)) {
+                keys.up = true;
+                if (game.state === 'PLAYING') e.preventDefault();
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            if (['ArrowLeft', 'KeyA'].includes(e.code)) keys.left = false;
+            if (['ArrowRight', 'KeyD'].includes(e.code)) keys.right = false;
+            if (['ArrowUp', 'KeyW', 'Space'].includes(e.code)) keys.up = false;
+        });
+
+        // ============================================================================
+        // 4. RENDERIZAÇÃO PROCEDURAL PIXEL ART (ESTILO NES 8-BIT)
+        // ============================================================================
+        const TILE = 36; // Tamanho base do bloco no canvas 960x540 (15 linhas de altura)
+
+        function drawBrickBlock(x, y, size) {
+            ctx.fillStyle = '#c84c0c';
+            ctx.fillRect(x, y, size, size);
+
+            // Detalhes de relevo claro
+            ctx.fillStyle = '#fcbcb0';
+            ctx.fillRect(x, y, size, 3);
+            ctx.fillRect(x, y + size / 2, size, 2);
+
+            // Argamassa preta
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(x, y + size / 2 - 2, size, 3);
+            ctx.fillRect(x, y + size - 3, size, 3);
+            ctx.fillRect(x + size / 2 - 1, y, 3, size / 2);
+            ctx.fillRect(x + size / 4, y + size / 2, 3, size / 2);
+            ctx.fillRect(x + (size * 3) / 4, y + size / 2, 3, size / 2);
+        }
+
+        function drawGroundBlock(x, y, size) {
+            ctx.fillStyle = '#c84c0c';
+            ctx.fillRect(x, y, size, size);
+
+            // Borda superior clara
+            ctx.fillStyle = '#fcbcb0';
+            ctx.fillRect(x + 2, y + 2, size - 4, 4);
+
+            // Rachaduras / pedras estilo chão do Mundo 1-1
+            ctx.strokeStyle = '#000000';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(x + 1, y + 1, size - 2, size - 2);
+
+            ctx.beginPath();
+            ctx.moveTo(x + size * 0.45, y);
+            ctx.lineTo(x + size * 0.45, y + size * 0.55);
+            ctx.lineTo(x + size, y + size * 0.55);
+            ctx.moveTo(x, y + size * 0.65);
+            ctx.lineTo(x + size * 0.45, y + size * 0.55);
+            ctx.stroke();
+        }
+
+        function drawQuestionBlock(x, y, size, used, animTick) {
+            if (used) {
+                ctx.fillStyle = '#8b6d5c';
+                ctx.fillRect(x, y, size, size);
+                ctx.strokeStyle = '#000';
+                ctx.lineWidth = 3;
+                ctx.strokeRect(x + 1.5, y + 1.5, size - 3, size - 3);
+                // Parafusos nos cantos
+                ctx.fillStyle = '#000';
+                ctx.fillRect(x + 4, y + 4, 3, 3);
+                ctx.fillRect(x + size - 7, y + 4, 3, 3);
+                ctx.fillRect(x + 4, y + size - 7, 3, 3);
+                ctx.fillRect(x + size - 7, y + size - 7, 3, 3);
+                return;
+            }
+
+            // Brilho pulsante estilo NES
+            const pulse = Math.floor(animTick / 12) % 3;
+            const colors = ['#f89800', '#fbd000', '#d87800'];
+            ctx.fillStyle = colors[pulse];
+            ctx.fillRect(x, y, size, size);
+
+            // Luz e sombra das bordas
+            ctx.fillStyle = '#fff5c0';
+            ctx.fillRect(x, y, size, 3);
+            ctx.fillRect(x, y, 3, size);
+
+            ctx.fillStyle = '#000';
+            ctx.fillRect(x, y + size - 3, size, 3);
+            ctx.fillRect(x + size - 3, y, 3, size);
+
+            // Parafusos
+            ctx.fillRect(x + 4, y + 4, 3, 3);
+            ctx.fillRect(x + size - 7, y + 4, 3, 3);
+            ctx.fillRect(x + 4, y + size - 7, 3, 3);
+            ctx.fillRect(x + size - 7, y + size - 7, 3, 3);
+
+            // Símbolo "?" em pixel art
+            ctx.fillStyle = '#000';
+            ctx.font = 'bold 20px "Press Start 2P", monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText('?', x + size / 2 + 2, y + size * 0.76 + 2);
+            ctx.fillStyle = '#ffffff';
+            ctx.fillText('?', x + size / 2, y + size * 0.76);
+        }
+
+        function drawPipe(x, y, w, h) {
+            const lipH = 26;
+            const bodyX = x + 4;
+            const bodyW = w - 8;
+
+            // Corpo do cano
+            ctx.fillStyle = '#00a800';
+            ctx.fillRect(bodyX, y + lipH, bodyW, h - lipH);
+
+            // Reflexo verde claro
+            ctx.fillStyle = '#80d010';
+            ctx.fillRect(bodyX + 6, y + lipH, 8, h - lipH);
+            ctx.fillRect(bodyX + 18, y + lipH, 3, h - lipH);
+
+            // Sombra direita
+            ctx.fillStyle = '#005800';
+            ctx.fillRect(bodyX + bodyW - 10, y + lipH, 10, h - lipH);
+
+            ctx.strokeStyle = '#000';
+            ctx.lineWidth = 3;
+            ctx.strokeRect(bodyX, y + lipH, bodyW, h - lipH);
+
+            // Boca do cano (topo)
+            ctx.fillStyle = '#00a800';
+            ctx.fillRect(x, y, w, lipH);
+            ctx.fillStyle = '#80d010';
+            ctx.fillRect(x + 6, y + 3, 10, lipH - 6);
+            ctx.fillStyle = '#005800';
+            ctx.fillRect(x + w - 12, y + 3, 12, lipH - 6);
+            ctx.strokeRect(x, y, w, lipH);
+        }
+
+        function drawCoin(x, y, size, animTick) {
+            const frame = Math.floor(animTick / 8) % 4;
+            const widths = [size * 0.65, size * 0.4, size * 0.18, size * 0.4];
+            const cw = widths[frame];
+            const cx = x + (size - cw) / 2;
+            const cy = y + 4;
+            const ch = size - 8;
+
+            ctx.fillStyle = '#fbd000';
+            ctx.fillRect(cx, cy, cw, ch);
+            ctx.strokeStyle = '#000';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(cx, cy, cw, ch);
+
+            if (cw > 10) {
+                ctx.fillStyle = '#fff5c0';
+                ctx.fillRect(cx + 3, cy + 4, 3, ch - 8);
+            }
+        }
+
+        function drawGoomba(x, y, w, h, animTick, squashed) {
+            if (squashed) {
+                ctx.fillStyle = '#a84400';
+                ctx.fillRect(x + 2, y + h - 12, w - 4, 12);
+                ctx.strokeStyle = '#000';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(x + 2, y + h - 12, w - 4, 12);
+                return;
+            }
+
+            const step = Math.floor(animTick / 10) % 2;
+
+            // Chapéu do cogumelo marrom
+            ctx.fillStyle = '#b84800';
+            ctx.beginPath();
+            ctx.moveTo(x + 6, y + 2);
+            ctx.lineTo(x + w - 6, y + 2);
+            ctx.lineTo(x + w, y + h * 0.62);
+            ctx.lineTo(x, y + h * 0.62);
+            ctx.closePath();
+            ctx.fill();
+            ctx.strokeStyle = '#000';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // Tronco bege
+            ctx.fillStyle = '#fcbcb0';
+            ctx.fillRect(x + 8, y + h * 0.62, w - 16, h * 0.24);
+
+            // Olhos e sobrancelhas bravas
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(x + 8, y + 9, 6, 9);
+            ctx.fillRect(x + w - 14, y + 9, 6, 9);
+
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(x + 10, y + 11, 3, 6);
+            ctx.fillRect(x + w - 13, y + 11, 3, 6);
+
+            // Sobrancelha
+            ctx.fillRect(x + 6, y + 7, 9, 3);
+            ctx.fillRect(x + w - 15, y + 7, 9, 3);
+
+            // Pés alternando animação
+            ctx.fillStyle = '#000000';
+            if (step === 0) {
+                ctx.fillRect(x + 3, y + h - 7, 11, 7);
+                ctx.fillRect(x + w - 13, y + h - 5, 10, 5);
+            } else {
+                ctx.fillRect(x + 4, y + h - 5, 10, 5);
+                ctx.fillRect(x + w - 14, y + h - 7, 11, 7);
+            }
+        }
+
+        function drawPlayer(p, animTick) {
+            ctx.save();
+            // Pisca quando invencível após dano
+            if (p.invincible > 0 && Math.floor(animTick / 4) % 2 === 0) {
+                ctx.globalAlpha = 0.45;
+            }
+
+            const x = Math.round(p.x);
+            const y = Math.round(p.y);
+            const w = p.w;
+            const h = p.h;
+
+            // Espelha sprite conforme direção
+            if (p.facing === -1) {
+                ctx.translate(x + w, y);
+                ctx.scale(-1, 1);
+            } else {
+                ctx.translate(x, y);
+            }
+
+            const runningFrame = Math.abs(p.vx) > 0.4 && p.grounded ? (Math.floor(animTick / 6) % 2) : 0;
+
+            // Boné Vermelho
+            ctx.fillStyle = '#e52521';
+            ctx.fillRect(6, 0, w - 10, 6);
+            ctx.fillRect(4, 5, w - 4, 4);
+
+            // Rosto (Pele)
+            ctx.fillStyle = '#fcbcb0';
+            ctx.fillRect(6, 9, w - 10, 11);
+            // Nariz
+            ctx.fillRect(w - 5, 11, 5, 5);
+
+            // Cabelo e Bigode
+            ctx.fillStyle = '#4a2800';
+            ctx.fillRect(4, 9, 4, 8);
+            ctx.fillRect(w - 11, 15, 10, 3);
+
+            // Olho
+            ctx.fillStyle = '#000';
+            ctx.fillRect(w - 10, 10, 3, 4);
+
+            // Camisa Vermelha + Macacão Azul
+            ctx.fillStyle = '#e52521';
+            ctx.fillRect(4, 20, w - 8, 10);
+
+            ctx.fillStyle = '#0058f8';
+            ctx.fillRect(7, 22, w - 14, 12);
+            // Alças do macacão
+            ctx.fillRect(8, 20, 3, 4);
+            ctx.fillRect(w - 11, 20, 3, 4);
+
+            // Botões amarelos
+            ctx.fillStyle = '#fbd000';
+            ctx.fillRect(9, 25, 2, 2);
+            ctx.fillRect(w - 11, 25, 2, 2);
+
+            // Braços
+            ctx.fillStyle = '#fcbcb0';
+            if (!p.grounded) {
+                // Braço levantado no pulo
+                ctx.fillRect(w - 5, 14, 5, 6);
+            } else {
+                ctx.fillRect(2, 22, 4, 7);
+                ctx.fillRect(w - 6, 22, 4, 7);
+            }
+
+            // Botas Marrons
+            ctx.fillStyle = '#6b3400';
+            if (!p.grounded) {
+                ctx.fillRect(4, h - 6, 9, 6);
+                ctx.fillRect(w - 11, h - 8, 9, 6);
+            } else if (runningFrame === 0) {
+                ctx.fillRect(5, h - 6, 9, 6);
+                ctx.fillRect(w - 13, h - 6, 9, 6);
+            } else {
+                ctx.fillRect(2, h - 7, 9, 6);
+                ctx.fillRect(w - 10, h - 5, 9, 6);
+            }
+
+            ctx.restore();
+        }
+
+        function drawScenery(camX) {
+            // Nuvens pixeladas em paralaxe suave
+            const clouds = [
+                { x: 140, y: 80, w: 90 },
+                { x: 520, y: 60, w: 120 },
+                { x: 980, y: 95, w: 85 },
+                { x: 1450, y: 65, w: 130 },
+                { x: 1950, y: 85, w: 95 },
+                { x: 2500, y: 60, w: 120 },
+                { x: 3100, y: 80, w: 110 }
+            ];
+
+            clouds.forEach(c => {
+                const sx = c.x - camX * 0.45;
+                if (sx + c.w < -50 || sx > gameCanvas.width + 50) return;
+
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(sx, c.y + 12, c.w, 22);
+                ctx.fillRect(sx + 14, c.y, c.w - 28, 16);
+                ctx.fillStyle = '#b8d8f8';
+                ctx.fillRect(sx + 4, c.y + 30, c.w - 8, 4);
+            });
+
+            // Arbustos verdes no chão
+            const bushes = [180, 680, 1280, 1880, 2450, 3150];
+            const groundY = gameCanvas.height - TILE * 2;
+            bushes.forEach(bx => {
+                const sx = bx - camX;
+                if (sx + 100 < 0 || sx > gameCanvas.width) return;
+
+                ctx.fillStyle = '#00a800';
+                ctx.fillRect(sx, groundY - 22, 92, 22);
+                ctx.fillRect(sx + 16, groundY - 36, 60, 16);
+                ctx.fillStyle = '#80d010';
+                ctx.fillRect(sx + 22, groundY - 30, 16, 6);
+                ctx.fillRect(sx + 52, groundY - 18, 20, 6);
+            });
+        }
+
+        function drawGoalFlagAndCastle(flagX, groundY) {
+            // Mastro da Bandeira
+            const poleH = 260;
+            const poleTop = groundY - poleH;
+
+            // Base do mastro
+            drawGroundBlock(flagX - 10, groundY - TILE, TILE);
+
+            // Haste
+            ctx.fillStyle = '#e0e0e0';
+            ctx.fillRect(flagX + 5, poleTop, 6, poleH - TILE);
+            ctx.strokeStyle = '#000';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(flagX + 5, poleTop, 6, poleH - TILE);
+
+            // Esfera dourada no topo
+            ctx.fillStyle = '#fbd000';
+            ctx.beginPath();
+            ctx.arc(flagX + 8, poleTop - 6, 9, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+
+            // Bandeira triangular verde
+            ctx.fillStyle = '#00a800';
+            ctx.beginPath();
+            ctx.moveTo(flagX + 5, poleTop + 8);
+            ctx.lineTo(flagX - 48, poleTop + 26);
+            ctx.lineTo(flagX + 5, poleTop + 44);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            // Castelo NES ao fundo
+            const cx = flagX + 130;
+            const cw = 150;
+            const ch = 130;
+            const cy = groundY - ch;
+
+            ctx.fillStyle = '#c84c0c';
+            ctx.fillRect(cx, cy + 35, cw, ch - 35);
+            ctx.fillRect(cx + 25, cy, cw - 50, 35);
+
+            // Ameias do castelo
+            for (let i = 0; i < 5; i++) {
+                ctx.fillRect(cx + i * 32, cy + 22, 20, 15);
+            }
+            for (let i = 0; i < 3; i++) {
+                ctx.fillRect(cx + 28 + i * 36, cy - 12, 20, 14);
+            }
+
+            // Porta preta arqueada
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(cx + cw / 2 - 22, groundY - 56, 44, 56);
+            ctx.beginPath();
+            ctx.arc(cx + cw / 2, groundY - 56, 22, Math.PI, 0);
+            ctx.fill();
+        }
+
+        // ============================================================================
+        // 5. ESTRUTURA DA FASE (MUNDO 1-1) E MOTOR DE FÍSICA
+        // ============================================================================
+        const LEVEL_WIDTH = 3850;
+        const GROUND_Y = 540 - TILE * 2; // 468px
+
+        const game = {
+            state: 'START', // START, PLAYING, GAMEOVER, VICTORY
+            score: 0,
+            coins: 0,
+            lives: 3,
+            cameraX: 0,
+            tick: 0,
+            flagX: 3520,
+            player: null,
+            platforms: [],
+            pipes: [],
+            coinItems: [],
+            enemies: [],
+            floatingPopups: []
+        };
+
+        function resetLevel(fullReset = true) {
+            if (fullReset) {
+                game.score = 0;
+                game.coins = 0;
+                game.lives = 3;
+            }
+
+            game.cameraX = 0;
+            game.tick = 0;
+            game.floatingPopups = [];
+
+            game.player = {
+                x: 90,
+                y: GROUND_Y - 40,
+                w: 30,
+                h: 38,
+                vx: 0,
+                vy: 0,
+                facing: 1,
+                grounded: false,
+                invincible: 0
+            };
+
+            // Plataformas (Chão com buracos + Blocos de tijolo e interrogação)
+            game.platforms = [];
+
+            // Segmentos de chão (deixando abismos desafiadores)
+            const groundSegments = [
+                { start: 0, end: 1150 },
+                { start: 1270, end: 2180 },
+                { start: 2310, end: LEVEL_WIDTH }
+            ];
+
+            groundSegments.forEach(seg => {
+                for (let gx = seg.start; gx < seg.end; gx += TILE) {
+                    game.platforms.push({ x: gx, y: GROUND_Y, w: TILE, h: TILE, type: 'ground' });
+                    game.platforms.push({ x: gx, y: GROUND_Y + TILE, w: TILE, h: TILE, type: 'ground' });
+                }
+            });
+
+            // Blocos aéreos (Tijolos e Blocos ?)
+            const blocks = [
+                { x: 340, y: GROUND_Y - 125, type: 'question', used: false },
+                { x: 460, y: GROUND_Y - 125, type: 'brick' },
+                { x: 496, y: GROUND_Y - 125, type: 'question', used: false },
+                { x: 532, y: GROUND_Y - 125, type: 'brick' },
+                { x: 568, y: GROUND_Y - 125, type: 'question', used: false },
+                { x: 604, y: GROUND_Y - 125, type: 'brick' },
+                { x: 532, y: GROUND_Y - 245, type: 'question', used: false },
+
+                { x: 1420, y: GROUND_Y - 125, type: 'brick' },
+                { x: 1456, y: GROUND_Y - 125, type: 'question', used: false },
+                { x: 1492, y: GROUND_Y - 125, type: 'brick' },
+
+                { x: 1680, y: GROUND_Y - 220, type: 'brick' },
+                { x: 1716, y: GROUND_Y - 220, type: 'brick' },
+                { x: 1752, y: GROUND_Y - 220, type: 'question', used: false },
+                { x: 1788, y: GROUND_Y - 220, type: 'brick' },
+
+                { x: 2560, y: GROUND_Y - 125, type: 'brick' },
+                { x: 2596, y: GROUND_Y - 125, type: 'brick' },
+                { x: 2632, y: GROUND_Y - 125, type: 'question', used: false },
+                { x: 2668, y: GROUND_Y - 125, type: 'brick' }
+            ];
+
+            blocks.forEach(b => {
+                game.platforms.push({
+                    x: b.x,
+                    y: b.y,
+                    w: TILE,
+                    h: TILE,
+                    type: b.type,
+                    used: !!b.used,
+                    bumpOffset: 0
+                });
+            });
+
+            // Escadaria final antes da bandeira
+            for (let step = 0; step < 5; step++) {
+                for (let row = 0; row <= step; row++) {
+                    game.platforms.push({
+                        x: 3180 + step * TILE,
+                        y: GROUND_Y - (row + 1) * TILE,
+                        w: TILE,
+                        h: TILE,
+                        type: 'brick'
+                    });
+                }
+            }
+
+            // Canos Verdes
+            game.pipes = [
+                { x: 760, y: GROUND_Y - 68, w: 62, h: 68 },
+                { x: 980, y: GROUND_Y - 98, w: 62, h: 98 },
+                { x: 1960, y: GROUND_Y - 86, w: 62, h: 86 },
+                { x: 2880, y: GROUND_Y - 76, w: 62, h: 76 }
+            ];
+
+            // Moedas flutuantes
+            game.coinItems = [
+                { x: 344, y: GROUND_Y - 175, collected: false },
+                { x: 855, y: GROUND_Y - 110, collected: false },
+                { x: 895, y: GROUND_Y - 130, collected: false },
+                { x: 935, y: GROUND_Y - 110, collected: false },
+                { x: 1200, y: GROUND_Y - 130, collected: false },
+                { x: 1720, y: GROUND_Y - 265, collected: false },
+                { x: 1756, y: GROUND_Y - 265, collected: false },
+                { x: 2235, y: GROUND_Y - 135, collected: false },
+                { x: 2600, y: GROUND_Y - 175, collected: false },
+                { x: 2636, y: GROUND_Y - 175, collected: false }
+            ];
+
+            // Inimigos estilo Goomba
+            game.enemies = [
+                { x: 640, y: GROUND_Y - 32, w: 32, h: 32, vx: -1.35, alive: true, squashTimer: 0 },
+                { x: 1080, y: GROUND_Y - 32, w: 32, h: 32, vx: -1.45, alive: true, squashTimer: 0 },
+                { x: 1520, y: GROUND_Y - 32, w: 32, h: 32, vx: -1.4, alive: true, squashTimer: 0 },
+                { x: 1840, y: GROUND_Y - 32, w: 32, h: 32, vx: 1.4, alive: true, squashTimer: 0 },
+                { x: 2480, y: GROUND_Y - 32, w: 32, h: 32, vx: -1.6, alive: true, squashTimer: 0 },
+                { x: 2740, y: GROUND_Y - 32, w: 32, h: 32, vx: -1.5, alive: true, squashTimer: 0 }
+            ];
+        }
+
+        function addFloatingPopup(text, x, y, color = '#fbd000') {
+            game.floatingPopups.push({ text, x, y, color, life: 45 });
+        }
+
+        function rectsOverlap(a, b) {
+            return (
+                a.x < b.x + b.w &&
+                a.x + a.w > b.x &&
+                a.y < b.y + b.h &&
+                a.y + a.h > b.y
+            );
+        }
+
+        function handlePlayerDamage() {
+            if (game.player.invincible > 0) return;
+
+            sfx.hurt();
+            game.lives--;
+
+            if (game.lives <= 0) {
+                game.state = 'GAMEOVER';
+                sfx.gameOver();
+                document.getElementById('gameOverStats').textContent =
+                    `PONTOS: ${String(game.score).padStart(6, '0')}  •  MOEDAS: ${game.coins}`;
+                gameOverScreen.classList.remove('hidden');
+            } else {
+                showToast(`AI! RESTAM ${game.lives} VIDA(S)!`, 2000);
+                game.player.x = Math.max(80, game.cameraX + 60);
+                game.player.y = 80;
+                game.player.vx = 0;
+                game.player.vy = 0;
+                game.player.invincible = 110;
+            }
+        }
+
+        // ============================================================================
+        // 6. ATUALIZAÇÃO DO LOOP DE JOGO (FÍSICA, COLISÕES E REGRAS)
+        // ============================================================================
+        function updateGame() {
+            game.tick++;
+
+            // Processa webcam em tempo real mesmo nas telas para feedback visual
+            processWebcamMotion();
+
+            if (game.state !== 'PLAYING') return;
+
+            const p = game.player;
+            if (p.invincible > 0) p.invincible--;
+
+            // Combina entrada da Webcam HD + Teclado
+            const inputLeft = keys.left || motionState.moveLeft;
+            const inputRight = keys.right || motionState.moveRight;
+            const inputJump = keys.up || motionState.jump;
+
+            const ACCEL = 0.62;
+            const FRICTION = 0.82;
+            const MAX_SPEED = 5.4;
+            const GRAVITY = 0.56;
+            const JUMP_FORCE = -12.6;
+
+            if (inputLeft && !inputRight) {
+                p.vx -= ACCEL;
+                p.facing = -1;
+            } else if (inputRight && !inputLeft) {
+                p.vx += ACCEL;
+                p.facing = 1;
+            } else {
+                p.vx *= FRICTION;
+                if (Math.abs(p.vx) < 0.12) p.vx = 0;
+            }
+
+            p.vx = Math.max(-MAX_SPEED, Math.min(MAX_SPEED, p.vx));
+
+            // Pulo
+            if (inputJump && p.grounded) {
+                p.vy = JUMP_FORCE;
+                p.grounded = false;
+                sfx.jump();
+            }
+
+            // Lista unificada de sólidos (plataformas + canos)
+            const solids = [...game.platforms, ...game.pipes];
+
+            // --- MOVIMENTO HORIZONTAL E COLISÃO X ---
+            p.x += p.vx;
+            if (p.x < 0) {
+                p.x = 0;
+                p.vx = 0;
+            }
+            if (p.x + p.w > LEVEL_WIDTH) {
+                p.x = LEVEL_WIDTH - p.w;
+                p.vx = 0;
+            }
+
+            for (const s of solids) {
+                if (rectsOverlap(p, s)) {
+                    if (p.vx > 0) {
+                        p.x = s.x - p.w;
+                        p.vx = 0;
+                    } else if (p.vx < 0) {
+                        p.x = s.x + s.w;
+                        p.vx = 0;
+                    }
+                }
+            }
+
+            // --- MOVIMENTO VERTICAL E COLISÃO Y ---
+            p.vy += GRAVITY;
+            if (p.vy > 14) p.vy = 14;
+            p.y += p.vy;
+            p.grounded = false;
+
+            for (const s of solids) {
+                if (rectsOverlap(p, s)) {
+                    if (p.vy > 0) {
+                        // Aterrissou no topo
+                        p.y = s.y - p.h;
+                        p.vy = 0;
+                        p.grounded = true;
+                    } else if (p.vy < 0) {
+                        // Bateu a cabeça por baixo
+                        p.y = s.y + s.h;
+                        p.vy = 1.5;
+
+                        if (s.type === 'question' && !s.used) {
+                            s.used = true;
+                            s.bumpOffset = -8;
+                            game.coins++;
+                            game.score += 200;
+                            sfx.coin();
+                            addFloatingPopup('+200', s.x + 6, s.y - 16);
+                        } else {
+                            if (s.bumpOffset !== undefined) s.bumpOffset = -5;
+                            sfx.bump();
+                        }
+                    }
+                }
+            }
+
+            // Suaviza animação de batida nos blocos
+            for (const plat of game.platforms) {
+                if (plat.bumpOffset && plat.bumpOffset < 0) {
+                    plat.bumpOffset += 1;
+                }
+            }
+
+            // Queda em buraco / abismo
+            if (p.y > gameCanvas.height + 40) {
+                handlePlayerDamage();
+            }
+
+            // --- COLETA DE MOEDAS FLUTUANTES ---
+            for (const c of game.coinItems) {
+                if (!c.collected) {
+                    const coinBox = { x: c.x, y: c.y, w: 26, h: 26 };
+                    if (rectsOverlap(p, coinBox)) {
+                        c.collected = true;
+                        game.coins++;
+                        game.score += 100;
+                        sfx.coin();
+                        addFloatingPopup('+100', c.x, c.y - 10);
+                    }
+                }
+            }
+
+            // --- ATUALIZAÇÃO E COLISÃO COM INIMIGOS (GOOMBAS) ---
+            for (const enemy of game.enemies) {
+                if (!enemy.alive) {
+                    if (enemy.squashTimer > 0) enemy.squashTimer--;
+                    continue;
+                }
+
+                enemy.x += enemy.vx;
+
+                // Inverte direção ao bater em canos ou bordas de abismo
+                let hitObstacle = false;
+                for (const pipe of game.pipes) {
+                    if (rectsOverlap(enemy, pipe)) {
+                        hitObstacle = true;
+                        break;
+                    }
+                }
+
+                // Verifica se há chão à frente para não cair em buracos
+                const probeX = enemy.vx > 0 ? enemy.x + enemy.w + 2 : enemy.x - 2;
+                const probeY = enemy.y + enemy.h + 6;
+                const hasFloorAhead = game.platforms.some(pl =>
+                    probeX >= pl.x && probeX <= pl.x + pl.w &&
+                    probeY >= pl.y && probeY <= pl.y + pl.h
+                );
+
+                if (hitObstacle || !hasFloorAhead || enemy.x <= 10 || enemy.x + enemy.w >= LEVEL_WIDTH - 10) {
+                    enemy.vx *= -1;
+                }
+
+                // Colisão Jogador vs Inimigo
+                if (rectsOverlap(p, enemy)) {
+                    const playerBottomPrev = (p.y - p.vy) + p.h;
+                    // Se o jogador está caindo em cima do Goomba
+                    if (p.vy > 0 && playerBottomPrev <= enemy.y + enemy.h * 0.65) {
+                        enemy.alive = false;
+                        enemy.squashTimer = 28;
+                        p.vy = -8.8; // Quique estilo Mario
+                        game.score += 150;
+                        sfx.stomp();
+                        addFloatingPopup('+150', enemy.x, enemy.y - 12, '#ffffff');
+                    } else {
+                        handlePlayerDamage();
+                    }
+                }
+            }
+
+            // --- POPUPS FLUTUANTES ---
+            for (let i = game.floatingPopups.length - 1; i >= 0; i--) {
+                const pop = game.floatingPopups[i];
+                pop.y -= 0.9;
+                pop.life--;
+                if (pop.life <= 0) game.floatingPopups.splice(i, 1);
+            }
+
+            // --- CÂMERA SEGUINDO O PERSONAGEM ---
+            const targetCamX = p.x - gameCanvas.width * 0.36;
+            game.cameraX = Math.max(0, Math.min(LEVEL_WIDTH - gameCanvas.width, targetCamX));
+
+            // --- CONDIÇÃO DE VITÓRIA (BANDEIRA DE CHEGADA) ---
+            if (p.x + p.w >= game.flagX) {
+                game.state = 'VICTORY';
+                game.score += 1000;
+                sfx.victory();
+                document.getElementById('victoryStats').textContent =
+                    `PONTUAÇÃO FINAL: ${String(game.score).padStart(6, '0')}  •  MOEDAS: ${game.coins}`;
+                victoryScreen.classList.remove('hidden');
+            }
+        }
+
+        // ============================================================================
+        // 7. RENDERIZAÇÃO DO FRAME NO CANVAS PRINCIPAL
+        // ============================================================================
+        function renderGame() {
+            const cw = gameCanvas.width;
+            const ch = gameCanvas.height;
+
+            // Céu azul NES clássico
+            ctx.fillStyle = '#5c94fc';
+            ctx.fillRect(0, 0, cw, ch);
+
+            // Cenário (Nuvens e Arbustos)
+            drawScenery(game.cameraX);
+
+            ctx.save();
+            ctx.translate(-Math.round(game.cameraX), 0);
+
+            // Bandeira de chegada e Castelo
+            drawGoalFlagAndCastle(game.flagX, GROUND_Y);
+
+            // Plataformas (Chão, Tijolos e Blocos ?)
+            for (const plat of game.platforms) {
+                if (plat.x + plat.w < game.cameraX - 40 || plat.x > game.cameraX + cw + 40) continue;
+
+                const drawY = plat.y + (plat.bumpOffset || 0);
+                if (plat.type === 'ground') {
+                    drawGroundBlock(plat.x, drawY, plat.w);
+                } else if (plat.type === 'brick') {
+                    drawBrickBlock(plat.x, drawY, plat.w);
+                } else if (plat.type === 'question') {
+                    drawQuestionBlock(plat.x, drawY, plat.w, plat.used, game.tick);
+                }
+            }
+
+            // Canos Verdes
+            for (const pipe of game.pipes) {
+                if (pipe.x + pipe.w < game.cameraX - 40 || pipe.x > game.cameraX + cw + 40) continue;
+                drawPipe(pipe.x, pipe.y, pipe.w, pipe.h);
+            }
+
+            // Moedas Giratórias
+            for (const c of game.coinItems) {
+                if (!c.collected) {
+                    drawCoin(c.x, c.y, 26, game.tick);
+                }
+            }
+
+            // Inimigos Goomba
+            for (const enemy of game.enemies) {
+                if (enemy.alive || enemy.squashTimer > 0) {
+                    drawGoomba(enemy.x, enemy.y, enemy.w, enemy.h, game.tick, !enemy.alive);
+                }
+            }
+
+            // Jogador
+            if (game.player) {
+                drawPlayer(game.player, game.tick);
+            }
+
+            // Popups de pontuação
+            ctx.font = 'bold 12px "Press Start 2P", monospace';
+            ctx.textAlign = 'center';
+            for (const pop of game.floatingPopups) {
+                ctx.fillStyle = '#000';
+                ctx.fillText(pop.text, pop.x + 2, pop.y + 2);
+                ctx.fillStyle = pop.color;
+                ctx.fillText(pop.text, pop.x, pop.y);
+            }
+
+            ctx.restore();
+
+            // --- HUD ESTILO NES NO TOPO DA TELA ---
+            drawHudNES();
+        }
+
+        function drawHudNES() {
+            ctx.save();
+            ctx.font = 'bold 14px "Press Start 2P", monospace';
+            ctx.textBaseline = 'top';
+
+            const drawShadowText = (text, x, y, color = '#ffffff', align = 'left') => {
+                ctx.textAlign = align;
+                ctx.fillStyle = '#000000';
+                ctx.fillText(text, x + 2, y + 2);
+                ctx.fillStyle = color;
+                ctx.fillText(text, x, y);
+            };
+
+            // Coluna 1: PONTOS
+            drawShadowText('PONTOS', 24, 14, '#ffffff', 'left');
+            drawShadowText(String(game.score).padStart(6, '0'), 24, 34, '#fbd000', 'left');
+
+            // Coluna 2: MOEDAS
+            drawShadowText('MOEDAS', 210, 14, '#ffffff', 'left');
+            drawShadowText(`🪙 x${String(game.coins).padStart(2, '0')}`, 210, 34, '#fbd000', 'left');
+
+            // Coluna 3: MUNDO
+            drawShadowText('MUNDO', 410, 14, '#ffffff', 'left');
+            drawShadowText('1-1', 425, 34, '#ffffff', 'left');
+
+            // Coluna 4: VIDAS
+            drawShadowText('VIDAS', 560, 14, '#ffffff', 'left');
+            drawShadowText(`❤️ x${game.lives}`, 560, 34, '#e52521', 'left');
+
+            // Indicador de Status da Captura de Movimento
+            const activeLeft = keys.left || motionState.moveLeft;
+            const activeRight = keys.right || motionState.moveRight;
+            const activeJump = keys.up || motionState.jump || (game.player && !game.player.grounded);
+
+            const badgeY = 14;
+            const drawBadge = (label, x, isActive) => {
+                ctx.fillStyle = isActive ? '#43b047' : 'rgba(0,0,0,0.55)';
+                ctx.fillRect(x, badgeY, 64, 24);
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(x, badgeY, 64, 24);
+                ctx.font = 'bold 9px "Press Start 2P", monospace';
+                ctx.fillStyle = isActive ? '#ffffff' : '#999999';
+                ctx.textAlign = 'center';
+                ctx.fillText(label, x + 32, badgeY + 8);
+            };
+
+            drawBadge('◄ ESQ', gameCanvas.width - 222, activeLeft);
+            drawBadge('▲ PULO', gameCanvas.width - 150, activeJump);
+            drawBadge('DIR ►', gameCanvas.width - 78, activeRight);
+
+            ctx.restore();
+        }
+
+        // Loop Principal 60 FPS
+        function gameLoop() {
+            updateGame();
+            renderGame();
+            requestAnimationFrame(gameLoop);
+        }
+
+        // ============================================================================
+        // 8. EVENTOS DE INTERFACE E INICIALIZAÇÃO
+        // ============================================================================
+        sensitivitySlider.addEventListener('input', (e) => {
+            motionState.sensitivity = Number(e.target.value);
+            sensitivityVal.textContent = `${motionState.sensitivity}%`;
+        });
+
+        toggleCamBtn.addEventListener('click', async () => {
+            sfx.init();
+            if (motionState.active) {
+                stopWebcam();
+                showToast('Webcam desativada.');
+            } else {
+                await startWebcam();
+            }
+        });
+
+        resizePipBtn.addEventListener('click', () => {
+            webcamPip.classList.toggle('expanded');
+        });
+
+        muteBtn.addEventListener('click', () => {
+            sfx.muted = !sfx.muted;
+            muteBtn.textContent = sfx.muted ? '🔇 SOM: OFF' : '🔊 SOM: ON';
+        });
+
+        document.getElementById('startWithCamBtn').addEventListener('click', async () => {
+            sfx.init();
+            await startWebcam();
+            resetLevel(true);
+            startScreen.classList.add('hidden');
+            game.state = 'PLAYING';
+        });
+
+        document.getElementById('startKeyboardBtn').addEventListener('click', () => {
+            sfx.init();
+            resetLevel(true);
+            startScreen.classList.add('hidden');
+            game.state = 'PLAYING';
+            showToast('Modo Teclado ativo! Use Setas/WASD + Espaço (ou ligue a câmera no topo).');
+        });
+
+        document.getElementById('restartGameOverBtn').addEventListener('click', () => {
+            sfx.init();
+            resetLevel(true);
+            gameOverScreen.classList.add('hidden');
+            game.state = 'PLAYING';
+        });
+
+        document.getElementById('restartVictoryBtn').addEventListener('click', () => {
+            sfx.init();
+            resetLevel(true);
+            victoryScreen.classList.add('hidden');
+            game.state = 'PLAYING';
+        });
+
+        // Inicia estado inicial e loop gráfico
+        window.onload = () => {
+            resetLevel(true);
+            gameLoop();
+        };
+    </script>
+</body>
+</html>
